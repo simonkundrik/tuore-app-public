@@ -81,6 +81,8 @@ input[type=range]{height:18px;}
 .discover-tile-name{font-size:11.5px;font-weight:600;margin:0 0 3px;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:28px;}
 .discover-tile-price{font-size:12px;font-weight:600;margin:0;}
 .discover-tile-badge{position:absolute;top:6px;left:6px;font-size:9.5px;padding:2px 6px;border-radius:999px;background:#E1F5EE;color:#085041;font-weight:600;}
+.discover-tile.oos{opacity:.55;}
+.discover-tile-badge.oos-badge{background:var(--color-background-danger);color:var(--color-text-danger);}
 .discover-tile-add{position:absolute;bottom:8px;right:8px;width:24px;height:24px;border-radius:50%;background:var(--color-text-primary);color:var(--color-background-primary);display:flex;align-items:center;justify-content:center;font-size:14px;border:none;cursor:pointer;padding:0;}
 .discover-tile-seeall{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--color-text-secondary);background:var(--color-background-secondary);}
 .discover-tile-seeall p{font-size:12px;font-weight:600;margin:0;}
@@ -4158,7 +4160,8 @@ function renderSectionedRows(box, allItems, sections, kind){
  box.innerHTML=sections.map(function(sec){
   var items=allItems.filter(function(i){return sec.groups.indexOf(i.group)>-1 && !isDislikedItem(i);});
   if(!items.length) return '';
-  var teaser=items.slice(0,DISCOVER_TEASER_LIMIT);
+  var teaser=items.filter(function(i){return i.inStock!==false;}).slice(0,DISCOVER_TEASER_LIMIT);
+  if(!teaser.length) teaser=items.slice(0,DISCOVER_TEASER_LIMIT);
   var tiles=teaser.map(function(item){return discoverTileHtml(item, kind);}).join('');
   if(items.length>DISCOVER_TEASER_LIMIT && kind==='grabgo') tiles+=seeAllTileHtml(sec.groups[0], sec.title, items.length);
   return '<div class="discover-section">'
@@ -4224,6 +4227,7 @@ function renderGrabgoCategory(){
  var items=GRABGO.filter(function(i){return i.group===group && !isDislikedItem(i);});
  var sort=GRABGO_SORTS.find(function(s){return s.id===grabgoCategoryState.sort;}) || GRABGO_SORTS[0];
  items=items.slice().sort(sort.cmp);
+ items=items.filter(function(i){return i.inStock!==false;}).concat(items.filter(function(i){return i.inStock===false;}));
  var tiles=items.map(function(item){return discoverTileHtml(item, 'grabgo');}).join('');
  document.getElementById('grabgocategory-title').textContent=sec?sec.title:'';
  document.getElementById('grabgocategory-count').textContent=items.length+' item'+(items.length===1?'':'s');
@@ -4235,14 +4239,18 @@ function renderGrabgoCategory(){
 function discoverTileHtml(item, kind){
  var addable=kind==='grabgo';
  var detailFn=kind==='grabgo'?'openGrabgoDetail':'openSauceDetail';
+ var oos=item.inStock===false;
  var badge=item.badges&&item.badges[0];
+ var badgeHtml=oos
+  ?'<span class="discover-tile-badge oos-badge">Out of stock</span>'
+  :(badge?'<span class="discover-tile-badge">'+esc(badge)+'</span>':'');
  var addBtn=addable?'<button class="discover-tile-add" onclick="event.stopPropagation();openGrabgoConfirm(\''+item.ean+'\')" aria-label="Add"><i class="ti ti-plus" aria-hidden="true"></i></button>':'';
  var onclick=' onclick="'+detailFn+'(\''+item.ean+'\')"';
- return '<div class="discover-tile"'+onclick+'>'
-  +(badge?'<span class="discover-tile-badge">'+badge+'</span>':'')
+ return '<div class="discover-tile'+(oos?' oos':'')+'"'+onclick+'>'
+  +badgeHtml
   +'<div class="discover-tile-img">'+grabgoImgOrIconHtml(item,124,'26px')+'</div>'
   +'<div class="discover-tile-body">'
-  +'<p class="discover-tile-name">'+item.name+'</p>'
+  +'<p class="discover-tile-name">'+esc(item.name)+'</p>'
   +'<p class="discover-tile-price">€'+item.price.toFixed(2)+'</p>'
   +'</div>'+addBtn
   +'</div>';
@@ -4262,7 +4270,7 @@ function openGrabgoDetail(ean){
  var activeScreen=document.querySelector('.screen.active');
  if(activeScreen) grabgoDetailFrom=activeScreen.id.replace('screen-','');
  var bannerHtml='<img src="'+prodImgUrl(item.ean,800)+'" loading="lazy" alt="" style="width:100%;height:200px;object-fit:cover;display:block;" data-fallback-icon="'+item.icon+'" data-icon-size="40px" onerror="tuoreImgFallback(this)"/>';
- var tagsHtml=(item.badges||[]).concat(item.dietTags||[]).map(function(t){return '<span class="tag" style="margin-right:6px;">'+t+'</span>';}).join('');
+ var tagsHtml=(item.badges||[]).concat(item.dietTags||[]).map(function(t){return '<span class="tag" style="margin-right:6px;">'+esc(t)+'</span>';}).join('');
  // K-Ruoka only sometimes attaches a real nutrition panel to raw produce, so
  // isWholeProduce (set only when we fell back to the hardcoded reference
  // table) misses items like a kiwi or strawberry that got real scraped
@@ -4271,6 +4279,11 @@ function openGrabgoDetail(ean){
  var isSingleIngredient=item.isWholeProduce || ['fresh_fruit','berries','raw_veg_snack'].indexOf(item.group)>-1;
  var unitLabel=item.unitPriceUnit==='kilogramma'?'kg':item.unitPriceUnit==='litra'?'l':item.unitPriceUnit;
  var priceLine='€'+item.price.toFixed(2)+(item.unit?(' / '+item.unit):'')+(item.unitPrice?(' · €'+item.unitPrice.toFixed(2)+' per '+unitLabel):'');
+ var stockLine=item.inStock===true
+  ?'<p style="font-size:12px;color:var(--color-text-success);margin:0 0 12px;"><span style="width:6px;height:6px;border-radius:50%;background:var(--color-text-success);display:inline-block;margin-right:5px;vertical-align:1px;"></span>In stock at K-Supermarket Hyvätuuli</p>'
+  :item.inStock===false
+  ?'<p style="font-size:12px;color:var(--color-text-danger);margin:0 0 12px;"><span style="width:6px;height:6px;border-radius:50%;background:var(--color-text-danger);display:inline-block;margin-right:5px;vertical-align:1px;"></span>Out of stock right now</p>'
+  :'';
  var macrosHtml='<div class="ing-card" style="margin-top:12px;">'
   +'<p style="font-size:12px;font-weight:600;color:var(--color-text-secondary);margin:0 0 4px;">Per 100g</p>'
   +grabgoMacroRow('Calories', item.kcal100, 'kcal')
@@ -4284,16 +4297,17 @@ function openGrabgoDetail(ean){
   +'</div>';
  var ingredientsHtml='<p style="font-size:12px;font-weight:600;color:var(--color-text-secondary);margin:16px 16px 6px;">Ingredients</p>'
   +(item.ingredientsText
-    ?'<p style="font-size:13px;margin:0 16px 4px;line-height:1.5;">'+item.ingredientsText+'</p>'
+    ?'<p style="font-size:13px;margin:0 16px 4px;line-height:1.5;">'+esc(item.ingredientsText)+'</p>'
     :isSingleIngredient
-    ?'<p style="font-size:13px;margin:0 16px 4px;line-height:1.5;">Single ingredient: '+item.name+'.</p>'
+    ?'<p style="font-size:13px;margin:0 16px 4px;line-height:1.5;">Single ingredient: '+esc(item.name)+'.</p>'
     :'<p style="font-size:12px;color:var(--color-text-tertiary);margin:0 16px 4px;">Full ingredients list not available for this product.</p>');
  document.getElementById('grabgodetail-body').innerHTML=
   bannerHtml
   +'<div style="padding:12px 16px 0;">'
   +(tagsHtml?('<div style="margin-bottom:8px;">'+tagsHtml+'</div>'):'')
-  +'<p style="font-weight:600;font-size:16px;margin:0 0 4px;">'+item.name+'</p>'
-  +'<p style="font-size:13px;color:var(--color-text-secondary);margin:0 0 12px;">'+priceLine+'</p>'
+  +'<p style="font-weight:600;font-size:16px;margin:0 0 4px;">'+esc(item.name)+'</p>'
+  +'<p style="font-size:13px;color:var(--color-text-secondary);margin:0 0 '+(stockLine?'4px':'12px')+';">'+priceLine+'</p>'
+  +stockLine
   +'<button onclick="openGrabgoConfirm(\''+item.ean+'\')" style="width:100%;margin-bottom:4px;">Add to plan</button>'
   +'</div>'
   +macrosHtml
@@ -4351,7 +4365,7 @@ function openGrabgoConfirm(ean){
  document.getElementById('scannerOverlay').style.display='block';
  var imgHtml='<img src="'+prodImgUrl(item.ean,96)+'" style="width:48px;height:48px;object-fit:cover;border-radius:6px;float:left;margin-right:10px;" onerror="this.remove()"/>';
  document.getElementById('scannerStatus').innerHTML=imgHtml
-  +'<p style="margin:0 0 4px;font-weight:600;">'+item.name+'</p>'
+  +'<p style="margin:0 0 4px;font-weight:600;">'+esc(item.name)+'</p>'
   +'<p style="margin:0 0 10px;font-size:12px;">Per 100g: '+Math.round(item.kcal100)+' kcal · '+item.protein100+'g protein</p>'
   +'<div style="margin:0 0 10px;clear:both;">Grams eaten <input type="text" inputmode="decimal" id="grabgoGrams" value="'+grams+'" oninput="updateGrabgoPreview()" style="width:70px;color:#000;margin-left:6px;" /> <span id="grabgoPreview" style="margin-left:8px;font-weight:600;"></span></div>'
   +'<button onclick="confirmGrabgoAdd()" style="margin-right:8px;">Add to today</button><button onclick="closeScanner()">Cancel</button>';
