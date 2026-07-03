@@ -3994,6 +3994,9 @@ function stockColor(inCount,total){
  if(inCount===0) return 'var(--color-text-danger)';
  return 'var(--color-text-warning)';
 }
+function stockDotHtml(color){
+ return '<span style="width:6px;height:6px;border-radius:50%;background:'+color+';display:inline-block;margin-left:5px;vertical-align:1px;"></span>';
+}
 function prodImgUrl(ean,w){ return 'https://public.keskofiles.com/f/k-ruoka/product/'+ean+'?w='+w+'&h='+w+'&fm=webp'; }
 function imgOrIconHtml(ean,iconClass,boxSize,iconSize){
  return '<img src="'+prodImgUrl(ean,boxSize*2)+'" loading="lazy" alt="" style="width:100%;height:100%;object-fit:cover;" data-fallback-icon="'+iconClass+'" data-icon-size="'+iconSize+'" onerror="tuoreImgFallback(this)"/>';
@@ -4246,12 +4249,13 @@ function discoverTileHtml(item, kind){
   :(badge?'<span class="discover-tile-badge">'+esc(badge)+'</span>':'');
  var addBtn=addable?'<button class="discover-tile-add" onclick="event.stopPropagation();openGrabgoConfirm(\''+item.ean+'\')" aria-label="Add"><i class="ti ti-plus" aria-hidden="true"></i></button>':'';
  var onclick=' onclick="'+detailFn+'(\''+item.ean+'\')"';
+ var stockDot=item.inStock===true?stockDotHtml('var(--color-text-success)'):oos?stockDotHtml('var(--color-text-danger)'):'';
  return '<div class="discover-tile'+(oos?' oos':'')+'"'+onclick+'>'
   +badgeHtml
   +'<div class="discover-tile-img">'+grabgoImgOrIconHtml(item,124,'26px')+'</div>'
   +'<div class="discover-tile-body">'
   +'<p class="discover-tile-name">'+esc(item.name)+'</p>'
-  +'<p class="discover-tile-price">€'+item.price.toFixed(2)+'</p>'
+  +'<p class="discover-tile-price">€'+item.price.toFixed(2)+stockDot+'</p>'
   +'</div>'+addBtn
   +'</div>';
 }
@@ -4450,12 +4454,14 @@ var HOME_SECTIONS=[
 function homeTileHtml(m){
  var t=totals(m);
  var badge=m.tags&&m.tags[0];
+ var inStockCount=m.ing.filter(function(ing){return resolveProduct(ing.ref).inStock;}).length;
+ var stockDot=stockDotHtml(stockColor(inStockCount,m.ing.length));
  return '<div class="discover-tile" role="button" tabindex="0" onclick="openMeal(\''+m.id+'\')" onkeydown="cardKey(event,\''+m.id+'\')">'
   +(badge?'<span class="discover-tile-badge">'+esc(badge)+'</span>':'')
   +'<div class="discover-tile-img">'+mealImgOrIconHtml(m,124,'26px')+'</div>'
   +'<div class="discover-tile-body">'
   +'<p class="discover-tile-name">'+esc(m.name)+'</p>'
-  +'<p class="discover-tile-price">€'+displayPrice(t).toFixed(2)+'</p>'
+  +'<p class="discover-tile-price">€'+displayPrice(t).toFixed(2)+stockDot+'</p>'
   +'</div>'
   +'</div>';
 }
