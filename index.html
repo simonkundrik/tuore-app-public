@@ -219,6 +219,17 @@ input[type=range]{height:18px;}
 <button class="price-mode-btn active" data-pricemode="per" onclick="setPriceMode(this)">Price per serving</button>
 <button class="price-mode-btn" data-pricemode="buy" onclick="setPriceMode(this)">Price for whole recipe</button>
 </div>
+<p style="font-size:12px;font-weight:600;color:var(--color-text-secondary);margin:16px 16px 4px;">Your data</p>
+<p style="font-size:11px;color:var(--color-text-tertiary);margin:0 16px 8px;">Back up your likes, meal log, dislikes and custom recipes — or restore them on a new device.</p>
+<div style="display:flex;gap:8px;padding:0 16px 16px;flex-wrap:wrap;">
+<button onclick="exportData(this)">Copy backup</button>
+<button onclick="toggleImportBox()">Import backup</button>
+</div>
+<div id="importBox" style="display:none;padding:0 16px 16px;">
+<textarea id="importText" rows="4" placeholder="Paste your backup here" style="width:100%;padding:10px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);font-family:inherit;font-size:12px;"></textarea>
+<button onclick="importData()" style="margin-top:8px;">Restore backup</button>
+<p id="importMsg" style="font-size:11px;color:var(--color-text-secondary);margin:6px 0 0;"></p>
+</div>
 </div>
 
 <div class="screen" id="screen-discover">
@@ -3581,6 +3592,32 @@ var dislikes=new Set(JSON.parse(localStorage.getItem('tuoreDislikes')||'[]'));
 function saveDislikes(){ localStorage.setItem('tuoreDislikes', JSON.stringify(Array.from(dislikes))); }
 var priceMode=localStorage.getItem('tuorePriceMode')||'per';
 function displayPrice(t){ return priceMode==='buy'?t.buy:t.per; }
+var TUORE_KEYS=['tuoreLiked','tuoreEquip','tuoreDiet','tuoreBudget','tuoreDislikes','tuorePriceMode','tuoreCustomMeals','tuoreMealLog'];
+function exportData(btn){
+ var out={};
+ TUORE_KEYS.forEach(function(k){ var v=localStorage.getItem(k); if(v!==null) out[k]=v; });
+ var text=JSON.stringify(out);
+ function ok(){ btn.textContent='Copied ✓'; setTimeout(function(){ btn.textContent='Copy backup'; },2000); }
+ function fail(){ window.prompt('Copy this backup text:', text); }
+ if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(ok,fail);
+ else fail();
+}
+function toggleImportBox(){
+ var box=document.getElementById('importBox');
+ box.style.display=box.style.display==='none'?'':'none';
+}
+function importData(){
+ var msg=document.getElementById('importMsg');
+ var raw=document.getElementById('importText').value.trim();
+ if(!raw){ msg.textContent='Paste a backup first.'; return; }
+ var data;
+ try{ data=JSON.parse(raw); }catch(err){ msg.textContent="That doesn't look like a Tuore backup."; return; }
+ var restored=0;
+ TUORE_KEYS.forEach(function(k){ if(typeof data[k]==='string'){ localStorage.setItem(k,data[k]); restored++; } });
+ if(!restored){ msg.textContent="That doesn't look like a Tuore backup."; return; }
+ msg.textContent='Restored '+restored+' item'+(restored===1?'':'s')+' — reloading…';
+ setTimeout(function(){ location.reload(); },600);
+}
 function setPriceMode(btn){
  document.querySelectorAll('.price-mode-btn').forEach(function(b){b.classList.remove('active');});
  btn.classList.add('active');
