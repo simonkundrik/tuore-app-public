@@ -232,6 +232,14 @@ input[type=range]{height:18px;}
 <button onclick="importData()" style="margin-top:8px;">Restore backup</button>
 <p id="importMsg" style="font-size:11px;color:var(--color-text-secondary);margin:6px 0 0;"></p>
 </div>
+<p style="font-size:12px;font-weight:600;color:var(--color-text-secondary);margin:16px 16px 4px;">Report a problem</p>
+<p style="font-size:11px;color:var(--color-text-tertiary);margin:0 16px 8px;">Spotted something wrong — a miscategorized item, a broken feature, anything odd? Describe it below and it's logged automatically for review.</p>
+<div style="padding:0 16px 16px;">
+<textarea id="bugReportText" rows="3" maxlength="2000" placeholder="e.g. The eggs in Grab & Go show up under Yogurts" style="width:100%;padding:10px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);font-family:inherit;font-size:12px;"></textarea>
+<input type="text" id="bugReportWebsite" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;" />
+<button onclick="submitBugReport()" id="bugReportBtn" style="margin-top:8px;">Send report</button>
+<p id="bugReportMsg" style="font-size:11px;color:var(--color-text-secondary);margin:6px 0 0;"></p>
+</div>
 </div>
 
 <div class="screen" id="screen-discover">
@@ -309,6 +317,8 @@ input[type=range]{height:18px;}
 
 <script>
 const SCRAPED_AT = "2026-07-05T03:34:24.868031+00:00";
+// Set after deploying cloudflare/report-bug-worker.js -- see that file for setup steps.
+const BUG_REPORT_URL = "https://tuore-bug-report.simonkundrik.workers.dev";
 const P={
 oats:{"nm": "Rolled oats", "ic": "ti-coffee", "product": "Elovena kaurahiutale 1 kg", "price": 2.27, "unit": "kpl", "inStock": true, "ean": "6416597113919","alts":[{"product": "Myllyn Paras Pikakaura+Kuitu Hiutale 500 g", "price": 1.94, "unit": "kpl", "ean": "6417700050855", "inStock": true},{"product": "Myllyn Paras täysjyvä pikakaurahiutale 500g", "price": 1.34, "unit": "kpl", "ean": "6417700053696", "inStock": true}]},
 berries:{"nm": "Frozen mixed berries", "ic": "ti-apple", "product": "Pirkka marjasekoitus 400g pakaste", "price": 2.99, "unit": "kpl", "inStock": true, "ean": "6410405302458","alts":[{"product": "Pakkasmarja 100 % Kotimainen Kuningas marjaseos mansikoita, mustikoita ja vadelmia 250 g pakaste", "price": 4.65, "unit": "kpl", "ean": "6411810009000", "inStock": true},{"product": "Pakkasmarja suomalainen tehosekoitus 1kg pakaste", "price": 11.99, "unit": "kpl", "ean": "6411810000465", "inStock": true}]},
@@ -4134,6 +4144,43 @@ function importData(){
  if(!restored){ msg.textContent="That doesn't look like a Tuore backup."; return; }
  msg.textContent='Restored '+restored+' item'+(restored===1?'':'s')+' — reloading…';
  setTimeout(function(){ location.reload(); },600);
+}
+// Bridges a user-typed message to a GitHub issue via a small Cloudflare
+// Worker (see cloudflare/report-bug-worker.js) -- the app is a static
+// site with no backend of its own, so this can't call GitHub directly
+// without exposing a write token to anyone who opens dev tools. Once the
+// issue exists, .github/workflows/claude-auto-triage.yml already takes it
+// from there (triages it, and opens a fix PR for clear, low-risk bugs).
+function submitBugReport(){
+ var text=document.getElementById('bugReportText').value.trim();
+ var honeypot=document.getElementById('bugReportWebsite').value;
+ var msgEl=document.getElementById('bugReportMsg');
+ var btn=document.getElementById('bugReportBtn');
+ if(honeypot) return; // a bot filled the hidden field -- silently drop
+ if(!text){ msgEl.textContent='Please describe the issue first.'; msgEl.style.color='var(--color-text-danger)'; return; }
+ btn.disabled=true;
+ msgEl.textContent='Sending…';
+ msgEl.style.color='var(--color-text-secondary)';
+ var activeScreen=document.querySelector('.screen.active');
+ fetch(BUG_REPORT_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+  message:text, page:activeScreen?activeScreen.id:'unknown', scrapedAt:SCRAPED_AT
+ })}).then(function(r){
+  return r.json().catch(function(){return {};}).then(function(d){return {ok:r.ok,data:d};});
+ }).then(function(res){
+  btn.disabled=false;
+  if(res.ok){
+   document.getElementById('bugReportText').value='';
+   msgEl.textContent="Thanks — we've logged this and it'll be reviewed automatically.";
+   msgEl.style.color='var(--color-text-success)';
+  }else{
+   msgEl.textContent='Something went wrong — please try again later.';
+   msgEl.style.color='var(--color-text-danger)';
+  }
+ }).catch(function(){
+  btn.disabled=false;
+  msgEl.textContent='Could not send — check your connection and try again.';
+  msgEl.style.color='var(--color-text-danger)';
+ });
 }
 function setPriceMode(btn){
  document.querySelectorAll('.price-mode-btn').forEach(function(b){b.classList.remove('active');});
