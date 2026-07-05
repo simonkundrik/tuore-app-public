@@ -5203,13 +5203,22 @@ function openMeal(id){
  showScreen('detail');
  window.scrollTo(0,0);
 }
+// Remembers each screen's scroll position across navigation, so going back
+// from a detail view (or just switching tabs and returning) lands you where
+// you left off instead of snapping to the top of the list. Detail screens
+// (grabgodetail/saucedetail/recipe detail) still open at the top regardless,
+// since their own open functions explicitly scroll to 0 right after this runs.
+var screenScrollPos={};
 function showScreen(id){
+ var prevActive=document.querySelector('.screen.active');
+ if(prevActive) screenScrollPos[prevActive.id]=window.scrollY;
  document.querySelectorAll('.screen').forEach(function(el){el.classList.remove('active');});
  document.getElementById('screen-'+id).classList.add('active');
  var tabId=(id==='grabgodetail'||id==='saucedetail'||id==='grabgocategory')?'discover':(id.indexOf('detail')===0?'home':id);
  document.querySelectorAll('.tab-btn').forEach(function(el){el.classList.remove('active');});
  var tab=document.querySelector('.tab-btn[data-tab="'+tabId+'"]');
  if(tab) tab.classList.add('active');
+ window.scrollTo(0, screenScrollPos['screen-'+id]||0);
 }
 customMeals.forEach(function(m){meals.push(m);});
 document.querySelectorAll('.price-mode-btn').forEach(function(b){b.classList.toggle('active', b.getAttribute('data-pricemode')===priceMode);});
