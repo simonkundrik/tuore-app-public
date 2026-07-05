@@ -1,0 +1,59 @@
+name: Deploy to GitHub Pages
+
+# Replaces the default "deploy from a branch" Pages build with a controlled
+# workflow, so the intermittent "Deployment failed, try again later" errors
+# from GitHub's Pages backend get retried in the same run instead of
+# surfacing as a failed deploy. The site keeps serving the last good deploy
+# throughout, so a transient blip never takes the app offline.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One deploy at a time; let an in-progress deploy finish rather than cancel it.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: github-pages
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      # deploy-pages already retries internally, but GitHub's backend can stay
+      # flaky past that window -- so we space out up to three whole attempts.
+      # The first two tolerate failure; only the third can fail the run, which
+      # would mean a genuinely sustained Pages outage worth looking at.
+      - name: Deploy (attempt 1)
+        id: try1
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+
+      - name: Wait before retry
+        if: steps.try1.outcome == 'failure'
+        run: sleep 90
+
+      - name: Deploy (attempt 2)
+        id: try2
+        if: steps.try1.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+
+      - name: Wait before final retry
+        if: steps.try1.outcome == 'failure' && steps.try2.outcome == 'failure'
+        run: sleep 150
+
+      - name: Deploy (attempt 3, final)
+        if: steps.try1.outcome == 'failure' && steps.try2.outcome == 'failure'
+        uses: actions/deploy-pages@v4
