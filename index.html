@@ -4815,7 +4815,7 @@ function openGrabgoDetail(ean){
  // table) misses items like a kiwi or strawberry that got real scraped
  // nutrition -- group membership catches those too, without misclassifying
  // genuinely multi-ingredient nuts/dips/ready-meals as "single ingredient"
- var isSingleIngredient=item.isWholeProduce || ['fresh_fruit','berries','raw_veg_snack'].indexOf(item.group)>-1;
+ var isSingleIngredient=item.isWholeProduce || ['fresh_fruit','raw_veg'].indexOf(item.group)>-1;
  var unitLabel=item.unitPriceUnit==='kilogramma'?'kg':item.unitPriceUnit==='litra'?'l':item.unitPriceUnit;
  var priceLine='€'+item.price.toFixed(2)+(item.unit?(' / '+item.unit):'')+(item.unitPrice?(' · €'+item.unitPrice.toFixed(2)+' per '+unitLabel):'');
  var stockLine=item.inStock===true
